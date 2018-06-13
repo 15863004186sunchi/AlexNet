@@ -1,0 +1,7 @@
+The Images '0.jpg' and '1.jpg' are for damo.
+it most be moved to the path 'classes' to be tested.
+
+How it works:
+1. exec. the 'monkeyAPP.py' first, to get a well-established classes seructure.
+2. move the Images under the  'classes' folder.
+3. exec. the 'monkeyAPP.py' onece again, and it'll move the Images to the right class.
