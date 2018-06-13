@@ -1,13 +1,11 @@
-import torch
-from torch import nn, device
-from torchvision import datasets
-from torchvision.transforms import Compose, Resize, RandomResizedCrop, RandomHorizontalFlip, ToTensor
-from torch.utils.data import DataLoader
 from collections import OrderedDict
-from PIL import Image
-import matplotlib.pyplot as plt
-from os import listdir, mkdir
+from os import listdir, mkdir, rename
 from os.path import isfile, join, exists
+
+import torch
+from PIL import Image
+from torch import nn
+from torchvision.transforms import Compose, Resize, ToTensor
 
 
 def scan_path(path):
@@ -20,19 +18,48 @@ def scan_path(path):
     """
 
     """ 1. """
-    if not exists(join(path, 'APP')):
-        mkdir(join(path, 'APP'))
+    if not exists(path):
+        mkdir(path)
 
     for i in range(10):
-        if not exists(join(path, 'APP/n'+str(i))):
-            mkdir(join(path, 'APP/n'+str(i)))
+        if not exists(join(path, 'n' + str(i))):
+            mkdir(join(path, 'n' + str(i)))
 
     """ 2. """
     images = [
-        f for f in listdir(path)
+        [join(path, f), f] for f in listdir(path)
         if isfile(join(path, f))]
 
     return images
+
+
+def image_loader(images):
+    transform = Compose([
+        Resize(size=(227, 227)),
+        ToTensor(),
+    ])
+
+    image_set = []
+    for image_name in images:
+        image = Image.open(image_name[0])
+        image = transform(image)
+
+        """ 
+        Due to image is a single image batch,
+        namely, it contents only one image in the batch.
+        Yet, torch.nn only accept 4-D tensor -- batch-like tensor.
+        Therefore, it is necessary to add a dim with value '1'
+        as the batch size.
+        
+        As for this case, 
+        (3x227x227) -> (1x3x227x227)
+        Just add 'print(image.shape)' before and after 'UnSqueeze'.
+        """
+        image = image.unsqueeze(0)
+        # image = image.cuda()
+        image_set.append(image)
+
+    return image_set
 
 
 class AlexNet(nn.Module):
@@ -136,8 +163,40 @@ class AlexNet(nn.Module):
 
 
 def main():
-    path = './'
-    images = scan_path(path)
+    monkeys = {
+        0: 'Alouatta Palliata',
+        1: 'Erythrocebus Patas',
+        2: 'Cacajao Calvus',
+        3: 'Macaca Fuscata',
+        4: 'Cebuella Pygmea',
+        5: 'Cebus Capucinus',
+        6: 'Mico Argentatus',
+        7: 'Saimiri Sciureus',
+        8: 'Aotus Nigriceps',
+        9: 'Trachypithecus Johnii',
+    }
+
+    path = './classes'
+    original_images = scan_path(path)
+    images = image_loader(original_images)
+    net = AlexNet()
+    net.load_state_dict(torch.load('alex_net.pkl'))
+    for i, im in enumerate(images):
+        output = net(im)
+        prediction_prob, prediction = torch.max(output, 1)
+        print(prediction_prob)
+        print(
+            'file: "{}" is recognized as type {}\n'.format(
+                original_images[i][1], prediction.numpy()[0]),
+            'and labeled as {}\n'.format(
+                monkeys[prediction.numpy()[0]]))
+
+        """ move image to class """
+        rename(
+            original_images[i][0],
+            join(
+                join(path, 'n' + str(prediction.numpy()[0])),
+                original_images[i][1]))
 
 
 if __name__ == '__main__':
